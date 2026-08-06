@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.placeholdercommand'
+// 从 gradle.properties 读取 jar 版本号，便于统一管理
+version = project.findProperty('pluginVersion') ?: '1.0.0'
+
+// 从 gradle.properties 读取编译目标版本，便于统一管理
+def javaTarget = project.findProperty('javaTarget') ?: '8'
+
+java {
+    sourceCompatibility = JavaVersion.toVersion(javaTarget)
+    targetCompatibility = JavaVersion.toVersion(javaTarget)
+}
+
+compileJava.options.release = Integer.parseInt(javaTarget)
+
+compileJava.options.encoding = 'UTF-8'
+compileTestJava.options.encoding = 'UTF-8'
+
+repositories {
+    mavenCentral()
+    // Spigot API（兼容 1.8.8 及以上的最广方案）
+    maven {
+        name = 'spigotmc'
+        url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+    }
+    // PlaceholderAPI
+    maven {
+        name = 'placeholderapi'
+        url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+    }
+}
+
+// 从 gradle.properties 读取编译目标 MC 版本，便于多版本切换
+def mcVersion = project.findProperty('mcVersion') ?: '1.20.1'
+def apiVersion = project.findProperty('apiVersion') ?: '1.13'
+
+dependencies {
+    // provided：运行时由服务器提供（Spigot API 兼容最广）
+    compileOnly "org.spigotmc:spigot-api:${mcVersion}-R0.1-SNAPSHOT"
+    // provided：运行时由安装的插件提供
+    compileOnly 'me.clip:placeholderapi:2.11.6'
+}
+
+processResources {
+    filesMatching('plugin.yml') {
+        expand 'version': project.version, 'apiVersion': apiVersion
+    }
+}
+
+// 默认 jar 产物，命名为 PlaceholderCommand-<version>.jar
+tasks.named('jar') {
+    archiveBaseName = 'PlaceholderCommand'
+    archiveVersion.set(project.version)
+}

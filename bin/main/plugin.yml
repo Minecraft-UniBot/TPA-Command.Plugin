@@ -1,0 +1,20 @@
+name: PlaceholderCommand
+version: '${version}'
+main: com.placeholdercommand.PlaceholderCommandPlugin
+api-version: '${apiVersion}'
+depend: [PlaceholderAPI]
+description: 为 PlaceholderAPI 插件提供指令丰富访问
+author: TPA-Command
+commands:
+  placeholdercommand:
+    description: 渲染文本或获取占位符变量值
+    usage: |
+      /placeholdercommand render [as <玩家>] <文本>
+      /placeholdercommand get [as <玩家>] <占位符>
+      /placeholdercommand list
+    aliases: [phc]
+    permission: placeholdercommand.use
+permissions:
+  placeholdercommand.use:
+    description: 允许使用 placeholdercommand 指令
+    default: op

@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master, 'support/**' ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master, 'support/**' ]
+  workflow_dispatch:
+
+# 并发控制：同一分支/标签只保留最新一次构建，避免排队浪费资源。
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # 1. 检出仓库
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # 2. 配置 JDK 17（Gradle 8.14.3 要求 17+；代码编译目标为 Java 8，JDK 17 即可覆盖）
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # 3. 赋予 gradlew 执行权限（Windows 克隆会丢失）
+      - name: Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      # 4. 构建。
+      #    gradle.properties 里硬编码了本地 macOS 的 org.gradle.java.home，
+      #    该路径在 Ubuntu 上不存在。这里引用 setup-java 导出的 $JAVA_HOME
+      #    （命令行系统属性优先级高于 gradle.properties），确保使用正确的 JDK。
+      #    --no-daemon 避免 CI 上残留 daemon；--stacktrace 便于排查远端编译问题。
+      - name: Build
+        run: ./gradlew build -Dorg.gradle.java.home="$JAVA_HOME" --no-daemon --stacktrace
+
+      # 5. 打 tag 时，在同一台机器上发布 GitHub Release。
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: build/libs/*.jar
+          generate_release_notes: true
