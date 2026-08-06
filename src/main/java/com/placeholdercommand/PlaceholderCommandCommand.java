@@ -22,13 +22,14 @@ import java.util.Locale;
  * <ul>
  *   <li>{@code /placeholdercommand render [as <玩家>] <文本>}</li>
  *   <li>{@code /placeholdercommand get [as <玩家>] <占位符>}</li>
+ *   <li>{@code /placeholdercommand gets [as <玩家>] <占位符1> <占位符2> ...}</li>
  *   <li>{@code /placeholdercommand list}</li>
  * </ul>
  */
 public final class PlaceholderCommandCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = Collections.unmodifiableList(
-            java.util.Arrays.asList("render", "get", "list"));
+            java.util.Arrays.asList("render", "get", "gets", "list"));
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender,
@@ -46,6 +47,9 @@ public final class PlaceholderCommandCommand implements CommandExecutor, TabComp
                 break;
             case "get":
                 onGet(sender, args);
+                break;
+            case "gets":
+                onGets(sender, args);
                 break;
             case "list":
                 onList(sender);
@@ -123,16 +127,49 @@ public final class PlaceholderCommandCommand implements CommandExecutor, TabComp
             return;
         }
 
-        String placeholder = args[index];
-
-        // 支持 %namespace:name% 形式，也支持省略 % 自动补全
-        if (!(placeholder.startsWith("%") && placeholder.endsWith("%")))
-            placeholder = "%" + placeholder + "%";
+        String placeholder = normalizePlaceholder(args[index]);
 
         String result = renderFor(sender, target, placeholder);
 
         // 纯文本输出：剥离联邦颜色/格式代码
         sender.sendMessage(strip(result));
+    }
+
+    // ------------------------------------------------------------------
+    // gets
+    // ------------------------------------------------------------------
+
+    private void onGets(CommandSender sender, String[] args) {
+        // gets [as <玩家>] <占位符1> <占位符2> ...
+        int index = 1;
+        Player target = null;
+
+        if (index < args.length && args[index].equalsIgnoreCase("as")) {
+            if (index + 1 >= args.length) {
+                sender.sendMessage("用法：/placeholdercommand gets [as <玩家>] <占位符1> <占位符2> ...");
+                return;
+            }
+            target = Bukkit.getPlayerExact(args[index + 1]);
+            if (target == null) {
+                sender.sendMessage("[ No Player ]");
+                return;
+            }
+            index += 2;
+        }
+
+        if (index >= args.length) {
+            sender.sendMessage("用法：/placeholdercommand gets [as <玩家>] <占位符1> <占位符2> ...");
+            return;
+        }
+
+        // 逐个解析占位符并逐行输出
+        for (int i = index; i < args.length; i++) {
+            String raw = args[i];
+            String placeholder = normalizePlaceholder(raw);
+            String value = renderFor(sender, target, placeholder);
+            // 剥离颜色/格式代码，保证纯文本输出
+            sender.sendMessage(placeholder + " = " + strip(value));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -189,6 +226,17 @@ public final class PlaceholderCommandCommand implements CommandExecutor, TabComp
                 .replace('\u00A7', ' ');
     }
 
+    /**
+     * 将用户输入规范化为占位符格式。
+     * <p>如果输入已包含 {@code %...%} 形式则原样返回；否则自动补全为 {@code %input%}。</p>
+     */
+    private String normalizePlaceholder(String input) {
+        String trimmed = input.trim();
+        if (trimmed.startsWith("%") && trimmed.endsWith("%"))
+            return trimmed;
+        return "%" + trimmed + "%";
+    }
+
     // ------------------------------------------------------------------
     // tab completion
     // ------------------------------------------------------------------
@@ -200,12 +248,12 @@ public final class PlaceholderCommandCommand implements CommandExecutor, TabComp
                                       @NotNull String[] args) {
         String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
 
-        // 第一级：render / get / list
+        // 第一级：render / get / gets / list
         if (args.length == 1) {
             return filter(SUBCOMMANDS, prefix);
         }
 
-        // 第二级：render / get 后可选 "as"，或直接是 <文本>/<占位符>
+        // 第二级：render / get / gets 后可选 "as"，或直接是 <文本>/<占位符>
         if (args.length == 2) {
             List<String> candidates = new ArrayList<>();
             candidates.add("as");
@@ -213,7 +261,7 @@ public final class PlaceholderCommandCommand implements CommandExecutor, TabComp
             return filter(candidates, prefix);
         }
 
-        // 第三级：render as <玩家> / get as <玩家> —— 补全玩家名
+        // 第三级：render as <玩家> / get as <玩家> / gets as <玩家> —— 补全玩家名
         if (args.length == 3 && args[1].equalsIgnoreCase("as")) {
             return filter(playerNames(), prefix);
         }
@@ -245,6 +293,7 @@ public final class PlaceholderCommandCommand implements CommandExecutor, TabComp
         sender.sendMessage("用法:");
         sender.sendMessage("  /" + label + " render [as <玩家>] <文本>");
         sender.sendMessage("  /" + label + " get [as <玩家>] <占位符>");
+        sender.sendMessage("  /" + label + " gets [as <玩家>] <占位符1> <占位符2> ...");
         sender.sendMessage("  /" + label + " list");
     }
 }

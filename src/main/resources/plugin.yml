@@ -11,6 +11,7 @@ commands:
     usage: |
       /placeholdercommand render [as <玩家>] <文本>
       /placeholdercommand get [as <玩家>] <占位符>
+      /placeholdercommand gets [as <玩家>] <占位符1> <占位符2> ...
       /placeholdercommand list
     aliases: [phc]
     permission: placeholdercommand.use
